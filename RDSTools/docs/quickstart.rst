@@ -8,10 +8,14 @@ Basic Usage
 
 Import the necessary modules::
 
-    from RDSTools import RDSdata, RDSmean, RDStable, RDSlm, RDSnetgraph, RDSmap
+    from RDSTools import load_toy_data, RDSdata, RDSmean, RDStable, RDSlm, RDSglm, RDSnetgraph, RDSmap
 
 Load your data::
 
+    # To use toy data (recommended for testing):
+    toy_data = load_toy_data()
+
+    # Or to use your own data:
     import pandas as pd
     data = pd.read_csv("your_survey_data.csv")
 
@@ -36,7 +40,7 @@ Calculate means with bootstrap resampling::
     mean_results = RDSmean(
         x='age',
         data=rds_processed,
-        var_est='resample_tree_uni1',
+        var_est='tree_uni',
         resample_n=1000
     )
 
@@ -45,7 +49,7 @@ For faster processing, use parallel bootstrap::
     mean_results = RDSmean(
         x='age',
         data=rds_processed,
-        var_est='resample_tree_uni1',
+        var_est='tree_uni',
         resample_n=1000,
         n_cores=4  # Use 4 cores for parallel processing
     )
@@ -56,17 +60,18 @@ Create Tables
 Generate frequency tables for categorical variables::
 
     sex_table = RDStable(
-        formula='~Sex',
+        x='Sex',
         data=rds_processed,
-        var_est='resample_tree_uni1',
+        var_est='tree_uni',
         resample_n=1000
     )
 
     # Two-way table
     cross_table = RDStable(
-        formula='~Sex+Race',
+        x='Sex',
+        y='Race',
         data=rds_processed,
-        var_est='resample_tree_uni1',
+        var_est='tree_uni',
         resample_n=1000,
         margins=1  # row proportions
     )
@@ -74,22 +79,22 @@ Generate frequency tables for categorical variables::
 Run Regression Models
 ---------------------
 
-Fit linear and logistic regression models::
+Fit linear (``RDSlm``) and logistic (``RDSglm``) regression models::
 
     # Linear regression
     model = RDSlm(
         data=rds_processed,
         formula='Income ~ Age + C(Sex) + C(Race)',
-        var_est='resample_tree_uni1',
+        var_est='tree_uni',
         resample_n=1000,
         n_cores=4
     )
 
     # Logistic regression (binary outcome)
-    logit_model = RDSlm(
+    logit_model = RDSglm(
         data=rds_processed,
         formula='Employed ~ Age + C(Education)',
-        var_est='resample_tree_uni1',
+        var_est='tree_uni',
         resample_n=1000
     )
 
@@ -114,7 +119,7 @@ Create network graphs to visualize recruitment relationships::
         seed_ids=['1', '2'],
         waves=[0, 1, 2],
         layout='Spring',
-        group_by='Sex'
+        variable='Sex'
     )
 
 Geographic Mapping

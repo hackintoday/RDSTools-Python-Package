@@ -38,13 +38,18 @@ Quick Start
 
 .. code-block:: python
 
-    import pandas as pd
+    from RDSTools import load_toy_data
     from RDSTools import RDSdata, RDSmean, RDStable, RDSlm
 
+    # Load the included example dataset
+    toy_data = load_toy_data()
+
     # Process RDS data
-    data = pd.read_csv("survey_data.csv")
+    # Or load your own data:
+    # import pandas as pd
+    # data = pd.read_csv("survey_data.csv")
     rds_data = RDSdata(
-        data=data,
+        data=toy_data,
         unique_id="ID",
         redeemed_coupon="CouponR",
         issued_coupons=["Coupon1", "Coupon2", "Coupon3"],
@@ -56,7 +61,7 @@ Quick Start
         x='Age',
         data=rds_data,
         weight='WEIGHT',
-        var_est='resample_tree_uni1',
+        var_est='tree_uni',
         resample_n=1000,
         n_cores=4  # parallel processing
     )
@@ -64,10 +69,10 @@ Quick Start
 
     # Create frequency tables
     table = RDStable(
-        formula='~Sex',
+        x='Sex',
         data=rds_data,
         weight='WEIGHT',
-        var_est='resample_tree_uni1',
+        var_est='tree_uni',
         resample_n=1000
     )
     print(table)
@@ -77,7 +82,7 @@ Quick Start
         data=rds_data,
         formula='Income ~ Age + C(Sex) + C(Race)',
         weight='WEIGHT',
-        var_est='resample_tree_uni1',
+        var_est='tree_uni',
         resample_n=1000,
         n_cores=4
     )
@@ -94,7 +99,8 @@ Key Features
 **Estimation**
     - ``RDSmean()`` - Calculate means with RDS-adjusted standard errors
     - ``RDStable()`` - Generate one-way and two-way frequency tables
-    - ``RDSlm()`` - Linear and logistic regression models
+    - ``RDSlm()`` - Linear regression models (numeric outcome)
+    - ``RDSglm()`` - Logistic regression models (binary outcome)
     - Weighted and unweighted analyses
     - Naive and bootstrap variance estimation
 
@@ -119,3 +125,4 @@ Indices and Tables
 * :ref:`genindex`
 * :ref:`modindex`
 * :ref:`search`
+

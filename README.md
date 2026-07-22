@@ -5,74 +5,131 @@ A Python package for Respondent-Driven Sampling (RDS) analysis and bootstrap res
 ## Table of Contents
 
 1. [Installation](#installation)
-2. [Data Processing](#data-processing)
-3. [Estimation](#estimation)
+2. [Example Dataset](#example-dataset)
+3. [Data Processing](#data-processing)
+4. [Estimation](#estimation)
    - [Means](#means)
    - [Tables](#tables)
    - [Regression](#regression)
-4. [Sampling Variance](#sampling-variance)
-5. [Visualization](#visualization)
+5. [Sampling Variance](#sampling-variance)
+6. [Visualization](#visualization)
    - [Recruitment Networks](#recruitment-networks)
    - [Geographic Mapping](#geographic-mapping)
-6. [Performance Enhancement](#performance-enhancement)
-7. [Requirements](#requirements)
+7. [Performance Enhancement](#performance-enhancement)
+8. [Requirements](#requirements)
 
 ## Installation
-
 ```bash
-cd RDSTools
-pip install .
+pip install RDSTools
 ```
 
-For development:
+For development (from source):
 ```bash
+git clone https://github.com/RDSTools/RDSTools-Python-Package.git
+cd RDSTools-Python-Package/RDSTools
 pip install -e .
+```
+
+## Example Dataset
+
+RDSTools includes a toy dataset for testing and learning. You can load it in three ways:
+
+### Method 1: Using load_toy_data() (Recommended)
+
+```python
+from RDSTools import load_toy_data, RDSdata
+
+# Load the example dataset
+toy_data = load_toy_data()
+print(f"Loaded {len(toy_data)} observations")
+
+# Process it with RDSdata
+rds_data = RDSdata(
+    data=toy_data,
+    unique_id="ID",
+    redeemed_coupon="CouponR",
+    issued_coupons=["Coupon1", "Coupon2", "Coupon3"],
+    degree="Degree"
+)
+```
+
+### Method 2: Using the RDSToolsToyData variable
+
+```python
+from RDSTools import RDSToolsToyData, RDSdata
+
+# The dataset is automatically loaded
+rds_data = RDSdata(
+    data=RDSToolsToyData,
+    unique_id="ID",
+    redeemed_coupon="CouponR",
+    issued_coupons=["Coupon1", "Coupon2", "Coupon3"],
+    degree="Degree"
+)
+```
+
+### Method 3: Getting the file path
+
+```python
+from RDSTools import get_toy_data_path
+import pandas as pd
+
+# Get the path and load manually
+path = get_toy_data_path()
+toy_data = pd.read_csv(path)
 ```
 
 ## Data Processing
 
-The `RDS_data()` function processes data collected through Respondent-Driven Sampling (RDS). This function extracts the unique ID, redeemed coupon numbers, and issued coupon numbers from the original dataset. By processing this information, users can obtain the key data typically required for RDS-related research.
+The `RDSdata()` function processes respondent-driven sampling data by reconstructing recruitment chains, calculating wave numbers, identifying seeds, and imputing missing degree values. It tracks how participants recruited one another through coupon redemption. **Use RDSdata before applying any estimation or plotting functions from the RDSTools package.**
 
 ### Usage
 
 ```python
-RDS_data(data, unique_id, redeemed_coupon, issued_coupons, degree)
+RDSdata(data, unique_id, redeemed_coupon, issued_coupons, degree, zero_degree="hotdeck", NA_degree="hotdeck")
 ```
 
 ### Arguments
 
-- **data**: A pandas DataFrame containing ID numbers for nodes in the social network and corresponding redeemed/issued coupon numbers.
+- **data**: pandas.DataFrame. Should contain an ID variable for sample case, corresponding redeemed coupon code, and issued coupon code.
 
-- **unique_id**: The column name representing ID numbers for nodes in the social network.
+- **unique_id**: str. The column name of the column with respondent IDs.
 
-- **redeemed_coupon**: The column name representing coupon numbers redeemed by respondents when participating in the survey.
+- **redeemed_coupon**: str. The column name of the column with coupon codes redeemed by respondents when participating in the study.
 
-- **issued_coupons**: List of column names representing coupon numbers issued to respondents.
+- **issued_coupons**: list of str. The column name of the column with coupon codes issued to respondents (i.e., coupons given to respondents to recruit their peers). If multiple coupons are issued, list all coupon code variables.
 
-- **degree**: The column name representing the degree (network size) of respondents.
+- **degree**: str. The column name of the column with degree (i.e., network size) reported by respondents.
 
-- **zero_degree**: Method for imputing zero values in degree variable ('mean', 'median', 'hotdeck', 'drop'). Default: 'hotdeck'.
+- **zero_degree**: str, optional. Used to set the method for handling zero values in the 'degree' variable. Three available methods are: mean imputation, median imputation, and hotdeck imputation. Default: 'hotdeck'.
 
-- **NA_degree**: Method for imputing missing values in degree variable ('mean', 'median', 'hotdeck', 'drop'). Default: 'hotdeck'.
+- **NA_degree**: str, optional. Used to set the method for handling missing values in the 'degree' variable. Three available methods are: mean imputation, median imputation, and hotdeck imputation. Default: 'hotdeck'.
 
 ### Example
 
 ```python
-import pandas as pd
-from RDSTools import RDS_data
+from RDSTools import load_toy_data, RDSdata
 
-# Load your data
-data = pd.read_csv("survey_data.csv")
+# Using the built-in toy dataset
+data = load_toy_data()
 
-# Process RDS structure
-rds_data = RDS_data(
+rds_data = RDSdata(
+    data=data,
+    unique_id="ID",
+    redeemed_coupon="CouponR",
+    issued_coupons=["Coupon1", "Coupon2", "Coupon3"],
+    degree="Degree"
+)
+
+# With custom imputation methods
+rds_data = RDSdata(
     data=data,
     unique_id="ID",
     redeemed_coupon="CouponR",
     issued_coupons=["Coupon1", "Coupon2", "Coupon3"],
     degree="Degree",
     zero_degree="median",
-    NA_degree="hotdeck"
+    NA_degree="mean"
 )
 
 print(f"Seeds: {rds_data['SEED'].sum()}")
@@ -83,34 +140,34 @@ print(f"Max wave: {rds_data['WAVE'].max()}")
 
 ### Means
 
-Calculate means and standard errors for RDS data with optional weighting and different variance estimation methods.
+Estimating mean with respondent driven sampling sample data. This function calculates weighted or unweighted means for a continuous variable. Standard errors are calculated using naive or resampling approaches from 'RDSboot'.
 
 ```python
-from RDSTools import RDSMean
+from RDSTools import RDSmean
 
 # Basic mean calculation
-result = RDSMean(
+result = RDSmean(
     x='age',
     data=rds_data,
     weight='WEIGHT',
-    var_est='resample_tree_uni1',
+    var_est='chain',
     resample_n=1000
 )
 
 # With optional returns
-result, bootstrap_means = RDSMean(
+result, bootstrap_means = RDSmean(
     x='age',
     data=rds_data,
-    var_est='resample_tree_uni1',
+    var_est='chain',
     resample_n=1000,
     return_bootstrap_means=True
 )
 
 # With both optional returns
-result, bootstrap_means, node_counts = RDSMean(
+result, bootstrap_means, node_counts = RDSmean(
     x='age',
     data=rds_data,
-    var_est='resample_tree_uni1', 
+    var_est='chain', 
     resample_n=1000,
     return_bootstrap_means=True,
     return_node_counts=True
@@ -119,33 +176,35 @@ result, bootstrap_means, node_counts = RDSMean(
 
 ### Tables
 
-Generate frequency tables and proportions for categorical variables with RDS-adjusted standard errors.
+Estimating one and two-way tables with respondent driven sampling sample data. One-way tables are constructed by specifying a categorical variable for x argument only. Two-way tables are constructed by specifying two categorical variables for x and y arguments. Standard errors of proportions are calculated using naive or resampling approaches from 'RDSboot'.
 
 ```python
-from RDSTools import RDSTable
+from RDSTools import RDStable
 
 # One-way table
-result = RDSTable(
-    formula="~Sex",
+result = RDStable(
+    x="Sex",
     data=rds_data,
-    var_est='resample_tree_uni1',
+    var_est='chain',
     resample_n=1000
 )
 
 # Two-way table
-result = RDSTable(
-    formula="~Sex+Race", 
+result = RDStable(
+    x="Sex",
+    y="Race", 
     data=rds_data,
-    var_est='resample_tree_uni1',
+    var_est='chain',
     resample_n=1000,
-    margins=1  # row totals
+    margins=1  # row proportions
 )
 
 # With optional returns
-result, bootstrap_tables = RDSTable(
-    formula="~Sex+Race",
+result, bootstrap_tables = RDStable(
+    x="Sex",
+    y="Race",
     data=rds_data,
-    var_est='resample_tree_uni1',
+    var_est='chain',
     resample_n=1000,
     return_bootstrap_tables=True
 )
@@ -153,184 +212,250 @@ result, bootstrap_tables = RDSTable(
 
 ### Regression
 
-Fit linear and logistic regression models with RDS-adjusted standard errors.
+Regression modeling with Respondent-Driven Sampling (RDS) sample data is split into two functions, mirroring R's `lm` / `glm`:
+
+- **`RDSlm()`** — linear regression for a **numeric (continuous)** outcome (mimics R's `lm`).
+- **`RDSglm()`** — logistic regression for a **binary** outcome (mimics R's `glm` with `family = binomial`).
+
+Each function fits only its own model type: passing a binary/categorical outcome to `RDSlm` (or a numeric/continuous outcome to `RDSglm`) raises a `ValueError` pointing you to the other function. Standard errors of regression coefficients are calculated using naive or resampling approaches from 'RDSboot'. The formula syntax follows R-style/patsy conventions.
+
+#### Linear regression — `RDSlm`
 
 ```python
-from RDSTools import RDSRegression
+from RDSTools import RDSlm
 
 # Linear regression (continuous dependent variable)
-result = RDSRegression(
+result = RDSlm(
     data=rds_data,
     formula="Age ~ Sex + Race",
     weight='WEIGHT',
-    var_est='resample_tree_uni1',
+    var_est='chain',
     resample_n=1000
 )
 
-# Logistic regression (binary dependent variable)
-result = RDSRegression(
+# Use C() to explicitly mark categorical predictors
+# This is especially important for numeric codes (e.g., 0/1, 1/2/3)
+result = RDSlm(
     data=rds_data,
-    formula="Employed ~ Age + Education",
-    var_est='resample_tree_uni1',
+    formula="Income ~ Age + C(Sex) + C(Race)",
+    var_est='chain',
     resample_n=1000
 )
 
 # With optional returns
-result, bootstrap_estimates = RDSRegression(
+result, bootstrap_estimates = RDSlm(
     data=rds_data,
     formula="Age ~ Sex + Race",
-    var_est='resample_tree_uni1',
+    var_est='chain',
     resample_n=1000,
     return_bootstrap_estimates=True
 )
 ```
 
-## Sampling Variance
-
-Although resampling is incorporated within the estimation functions, users who wish to perform resampling separately can use `RDSBoot()`. After preprocessing, ensure the presence of at least four variables: `ID`, `S_ID`, `SEED`, and `R_ID`. Note that the sampling of respondents (seeds and recruits) is conducted with replacement, and the resulting data frame will contain duplicates.
+#### Logistic regression — `RDSglm`
 
 ```python
-from RDSTools import RDSBoot
+from RDSTools import RDSglm
+
+# Logistic regression (binary dependent variable)
+result = RDSglm(
+    data=rds_data,
+    formula="Employed ~ Age + Education",
+    var_est='chain',
+    resample_n=1000
+)
+```
+
+A two-level outcome is coded so that the alphabetically-first level is the baseline (0) and the second is the modeled success (1); the output states the direction explicitly, e.g. `Coefficients: log-odds of yes vs. reference no`. An outcome already supplied as numeric 0/1 is left as coded (success = 1, baseline = 0).
+
+**Note on Categorical Variables:** Use `C()` around predictor names to treat them as categorical. This is important when:
+- Variables are numeric codes (e.g., Sex coded as 0/1)
+- You want to ensure proper dummy variable creation
+- Variables might be interpreted as continuous otherwise
+
+## Sampling Variance
+
+Bootstrap Resampling for Respondent Driven Sampling (RDS). Although resampling is incorporated within the estimation functions, users who wish to perform resampling separately can use `RDSboot()` or `RDSBootOptimizedParallel()`. After preprocessing with RDSdata, ensure the presence of at least four variables: `ID`, `S_ID`, `SEED`, and `R_ID`. Note that the sampling of respondents (seeds and recruits) is conducted with replacement, and the resulting data frame will contain duplicates.
+
+```python
+from RDSTools import RDSboot
 
 # Bootstrap resampling
-boot_results = RDSBoot(
+boot_results = RDSboot(
     data=rds_data,
     respondent_id_col='ID',
     seed_id_col='S_ID', 
     seed_col='SEED',
     recruiter_id_col='R_ID',
-    type='resample_tree_uni1',
+    type='tree_uni',
     resample_n=1000
 )
 
-```
+# Parallel bootstrap for better performance
+from RDSTools import RDSBootOptimizedParallel
 
-### Bootstrap Chain
-
-In bootstrap chain functions, the first step is to select seeds with replacement with the subsequent selection of seeds' full recruitment chains.
-
-- **resample_chain1**: The number of selected seeds equals the number of seeds in the data frame. Since the seeds are selected with replacement, the resulting data frame will contain exactly the same number of seeds, but a different number of recruits.
-
-- **resample_chain2**: Selects only 1 seed at each iteration. The resulting number of seeds will vary, but the number of recruits will be equal or larger to the original number of recruits.
-
-### Resample Tree Unidirectional
-
-In the resample tree, the function performs SRSWR from the seeds and their recruitment chains. As before, seeds are selected with replacement. For each selected seed, the function identifies its recruits and then samples with replacement from these recruits. For each sampled recruit, this process repeats until the end of each individual recruitment chain.
-
-- **resample_tree_uni1**: Since all seeds are selected with replacement, the resulting number of seeds will equal the number of seeds from the original data, but the number of recruits will vary.
-
-- **resample_tree_uni2**: Samples only 1 seed at a time and then performs sampling with replacement from each wave of seed's recruits. The resulting data frame will have at least the original number of observations, but a varying number of seeds.
-
-### Bootstrap Tree Bidirectional
-
-Unlike the unidirectional case, bidirectional resampling starts from a random position in a chain, checks its connected nodes, and then samples with replacement from these nodes. For each sampled node, the process repeats, but does not go backwards; that is, already visited nodes are excluded from subsequent sampling.
-
-- **resample_tree_bi1**: The function starts from n nodes, depending on the number of seeds.
-
-- **resample_tree_bi2**: The function samples one node at a time and then evaluates whether the resulting sample is at least equal to the size of the original data. If not, the function continues resampling until the desired number of respondents is achieved.
-
-### Example: Bootstrap Chain
-
-```python
-# Chain bootstrap 1 - maintains number of seeds
-res_chain1 = RDSBoot(
+boot_results = RDSBootOptimizedParallel(
     data=rds_data,
     respondent_id_col='ID',
     seed_id_col='S_ID',
-    seed_col='SEED', 
+    seed_col='SEED',
     recruiter_id_col='R_ID',
-    type='resample_chain1',
-    resample_n=1
+    type='tree_uni',
+    resample_n=1000,
+    n_cores=4
 )
-
-# Check results - merge with original data
-sample_1 = res_chain1[res_chain1['RESAMPLE.N'] == 1]
-merged = pd.merge(sample_1, rds_data, left_on='RESPONDENT_ID', right_on='ID')
-print(f"Original seeds: {rds_data['SEED'].sum()}")
-print(f"Bootstrap seeds: {merged['SEED'].sum()}")
 ```
+
+### Bootstrap Methods
+
+Three resampling methods are available. Each sets the number of seeds in a given resample to be consistent with the number of seeds in the original sample (s).
+
+#### Bootstrap Chain
+
+- **chain**: Selects (s) seeds using SRSWR from all seeds in the original sample and then all nodes in the chains created by each of the resampled seeds are retained.
+
+#### Resample Tree Unidirectional
+
+- **tree_uni**: (s) seeds are selected using Simple Random Sampling with Replacement (SRSWR) from all seeds. For each selected seed, this method (A) checks its recruit counts, (B) selects SRSWR of the recruits counts from all recruits identified in (A), and (C) for each sampled recruit, this method repeats Steps A and B. (D) Steps A, B, and C continue until reaching the last wave of each chain.
+
+#### Bootstrap Tree Bidirectional
+
+- **tree_bi**: Selects (s) nodes from the recruitment chains using SRSWR. For each selected node, it (A) checks its connected nodes (i.e., both recruiters and recruits) and their count, (B) from all connected nodes identified in (A), performs SRSWR of the same node count, and (C) for each selected node, performs steps A and B, but does not resample already resampled nodes. (D) Steps A, B, and C are repeated until the end of the chain.
 
 ## Visualization
 
-The package supports visualization of respondents' networks and the geographic distribution of recruitment waves starting from seeds. Users can generate network plots to examine recruitment chains overall and by demographic characteristics, as well as geographic maps that display participant locations and the spread of recruitment over time or across regions.
-
 ### Recruitment Networks
 
-The `create_network_graph()` function creates network visualizations showing recruitment relationships with support for different layouts and node coloring by demographic variables.
+Visualize recruitment relationships through network graphs with various layout options and customizable styling.
 
 ```python
-from RDSTools.network_graph import create_network_graph
+from RDSTools import RDSnetgraph, get_available_seeds, get_available_waves
+
+# Get available seeds and waves
+seeds = get_available_seeds(rds_data)
+waves = get_available_waves(rds_data)
 
 # Basic network graph
-G = create_network_graph(
+G = RDSnetgraph(
     data=rds_data,
-    seed_ids=['1', '2'],
-    waves=[0, 1, 2, 3],
+    seed_ids=seeds[:2],
+    waves=waves[:4],
     layout='Spring'
 )
 
-# Tree layout showing hierarchical structure
-G = create_network_graph(
+# Color nodes by demographic variable
+G = RDSnetgraph(
+    data=rds_data,
+    seed_ids=seeds[:2],
+    waves=waves[:3],
+    layout='Spring',
+    variable='Sex',
+    title='Recruitment Network by Sex',
+    save_path='network.png'
+)
+
+# Different layout options
+G = RDSnetgraph(
     data=rds_data,
     seed_ids=['1'],
     waves=[0, 1, 2, 3, 4],
-    layout='Tree',
-    save_path='recruitment_tree.png'
-)
-
-# Color nodes by demographic variable
-G = create_network_graph(
-    data=rds_data,
-    seed_ids=['1', '2', '3'],
-    waves=[0, 1, 2],
-    layout='Kamada-Kawai',
-    group_by='Gender',
-    node_size=20,
-    figsize=(16, 14)
+    layout='Tree',  # Options: 'Spring', 'Tree', 'Circular', 'Kamada-Kawai'
+    figsize=(12, 10)
 )
 ```
+
 
 ### Geographic Mapping
 
 When longitude and latitude data are available, users can create interactive maps showing participant distributions and recruitment patterns across geographic areas.
 
 ```python
-from RDSTools.rds_map import create_participant_map, print_map_info
+from RDSTools import RDSmap, get_available_seeds, get_available_waves, print_map_info
 
 # Check available data for mapping
 print_map_info(rds_data, lat_column='Latitude', lon_column='Longitude')
 
-# Basic map
-m = create_participant_map(
+# Get available seeds and waves
+seeds = get_available_seeds(rds_data)
+waves = get_available_waves(rds_data)
+print(f"Available seeds: {seeds}")
+print(f"Available waves: {waves}")
+
+# Simplest map - uses all available waves by default
+m = RDSmap(
     data=rds_data,
+    lat='Latitude',
+    long='Longitude',
+    seed_ids=['1', '2'],
+    output_file='my_rds_map.html'
+)
+
+# Basic map with specific waves
+m = RDSmap(
+    data=rds_data,
+    lat='Latitude',
+    long='Longitude',
     seed_ids=['1', '2'],
     waves=[0, 1, 2, 3],
     output_file='my_rds_map.html'
 )
 
-# Map with custom coordinates and auto-open browser
-m = create_participant_map(
+# Map with custom styling
+m = RDSmap(
     data=rds_data,
+    lat='Latitude',
+    long='Longitude',
     seed_ids=['1', '2', '3'],
     waves=[0, 1, 2, 3, 4],
-    lat_column='lat',
-    lon_column='long',
+    seed_color='red',
+    seed_radius=7,
+    recruit_color='blue',
+    recruit_radius=7,
+    line_color='black',
+    line_weight=2,
+    zoom_start=5,
     output_file='geographic_map.html',
-    zoom_start=7,
     open_browser=True
+)
+
+# Using helper functions for seed and wave selection
+m = RDSmap(
+    data=rds_data,
+    lat='Latitude',
+    long='Longitude',
+    seed_ids=seeds[:3],
+    waves=waves[:4],
+    line_dashArray='5,6',  # Dashed lines
+    output_file='custom_map.html'
 )
 ```
 
+**Key Parameters:**
+- `lat` - Column name for latitude coordinates
+- `long` - Column name for longitude coordinates
+- `seed_ids` - List of seed IDs to display
+- `waves` - List of wave numbers to display (optional, defaults to all available waves)
+- `seed_color` - Color of seed markers (default: "red")
+- `seed_radius` - Size of seed markers (default: 7)
+- `recruit_color` - Color of recruit markers (default: "blue")
+- `recruit_radius` - Size of recruit markers (default: 7)
+- `line_color` - Color of recruitment lines (default: "black")
+- `line_weight` - Thickness of recruitment lines (default: 2)
+- `line_dashArray` - Optional dash pattern for lines (e.g., '5,6')
+- `zoom_start` - Initial map zoom level (default: 5)
+- `output_file` - Name of HTML file to save (default: 'participant_map.html')
+- `open_browser` - Whether to open map in browser automatically (default: False)
+
 ## Performance Enhancement
 
-The package includes parallel processing for bootstrap methods. Unidirectional and bidirectional bootstrap sampling methods are the methods that benefit the most from parallel processing.
+The package includes parallel processing for bootstrap methods. Unidirectional and bidirectional bootstrap sampling methods benefit the most from parallel processing.
 
 ```python
 # Use parallel processing for faster bootstrap
-result = RDSMean(
+result = RDSmean(
     x='income',
     data=rds_data,
-    var_est='resample_tree_uni1',
+    var_est='tree_uni',
     resample_n=2000,
     n_cores=8  # Use 8 cores for parallel processing
 )
@@ -338,7 +463,7 @@ result = RDSMean(
 
 ### Performance Comparison
 
-With 252 observations
+With 252 observations:
 
 | Cores | Bootstrap Samples | Standard Time | Parallel Time | Speedup |
 |-------|-------------------|---------------|---------------|---------|
@@ -346,18 +471,169 @@ With 252 observations
 | 4     | 1000             | 120s          | 18s           | 6.7x    |
 | 8     | 1000             | 120s          | 12s           | 10.0x   |
 
+## Complete Example Workflow
+
+```python
+from RDSTools import (
+    load_toy_data, RDSdata, RDSboot, RDSmean, RDStable, RDSlm, RDSglm,
+    RDSmap, RDSnetgraph, get_available_seeds, get_available_waves, print_map_info
+)
+
+# 1. Load and process data
+# Option A: Use the included toy dataset
+toy_data = load_toy_data()
+rds_data = RDSdata(
+    data=toy_data,
+    unique_id="ID",
+    redeemed_coupon="CouponR",
+    issued_coupons=["Coupon1", "Coupon2", "Coupon3"],
+    degree="Degree"
+)
+
+# Option B: Load your own data
+# import pandas as pd
+# data = pd.read_csv("survey_data.csv")
+# rds_data = RDSdata(
+#     data=data,
+#     unique_id="ID",
+#     redeemed_coupon="CouponR",
+#     issued_coupons=["Coupon1", "Coupon2", "Coupon3"],
+#     degree="Degree"
+# )
+
+# 2. Calculate weighted means
+age_mean = RDSmean(
+    x='Age',
+    data=rds_data,
+    weight='WEIGHT',
+    var_est='tree_uni',
+    resample_n=1000,
+    n_cores=4
+)
+print(age_mean)
+
+# 3. Create frequency tables
+sex_table = RDStable(
+    x='Sex',
+    data=rds_data,
+    weight='WEIGHT',
+    var_est='tree_uni',
+    resample_n=1000
+)
+print(sex_table)
+
+# 4. Run regression analysis
+model = RDSlm(
+    data=rds_data,
+    formula='Income ~ Age + C(Sex) + C(Race)',
+    weight='WEIGHT',
+    var_est='tree_uni',
+    resample_n=1000,
+    n_cores=4
+)
+print(model)
+
+# 4b. Run logistic regression (binary outcome) with RDSglm
+logit = RDSglm(
+    data=rds_data,
+    formula='Sex ~ Age + C(Race)',
+    weight='WEIGHT',
+    var_est='tree_uni',
+    resample_n=1000,
+    n_cores=4
+)
+print(logit)
+
+# 5. Visualize recruitment network
+seeds = get_available_seeds(rds_data)
+waves = get_available_waves(rds_data)
+
+G = RDSnetgraph(
+    data=rds_data,
+    seed_ids=seeds[:2],
+    waves=waves[:4],
+    layout='Spring',
+    variable='Sex',
+    title='Recruitment Network by Sex',
+    save_path='network.png'
+)
+
+# 6. Create geographic map (uses all waves by default)
+print_map_info(rds_data, lat_column='Latitude', lon_column='Longitude')
+
+m = RDSmap(
+    data=rds_data,
+    lat='Latitude',
+    long='Longitude',
+    seed_ids=seeds[:2],  # Uses all available waves automatically
+    output_file='recruitment_map.html',
+    open_browser=True
+)
+```
+
 ## Requirements
 
 - Python ≥ 3.7
 - pandas ≥ 1.3.0
 - numpy ≥ 1.20.0
 - statsmodels ≥ 0.12.0
+- matplotlib ≥ 3.3.0
+- networkx ≥ 2.5
+- igraph ≥ 0.9.0 (python-igraph)
+- folium ≥ 0.12.0 (for geographic mapping)
+- scipy ≥ 1.7.0
+- patsy ≥ 0.5.0
+
+## API Reference
+
+### Core Functions
+
+- **`RDSdata()`** - Process RDS survey data
+- **`RDSboot()`** - Bootstrap resampling for variance estimation
+- **`RDSmean()`** - Calculate means with RDS adjustments
+- **`RDStable()`** - Generate frequency tables
+- **`RDSlm()`** - Linear regression models (numeric outcome)
+- **`RDSglm()`** - Logistic regression models (binary outcome)
+
+### Visualization Functions
+
+- **`RDSnetgraph()`** - Create recruitment network visualizations
+- **`RDSmap()`** - Generate interactive geographic maps
+- **`get_available_seeds()`** - Get list of seed IDs in data
+- **`get_available_waves()`** - Get list of wave numbers in data
+- **`print_map_info()`** - Display mapping information summary
+
+### Data Utilities
+
+- **`load_toy_data()`** - Load the included example dataset
+- **`get_toy_data_path()`** - Get the file path to the example dataset
+- **`RDSToolsToyData`** - Pre-loaded example dataset variable
+
+### Advanced Functions
+
+- **`RDSBootOptimizedParallel()`** - Parallelized bootstrap (used internally)
+
+### Bootstrap Methods
+
+Available variance estimation methods for `var_est` parameter:
+
+- `chain` - Bootstrap chain resampling
+- `tree_uni` - Unidirectional tree resampling
+- `tree_bi` - Bidirectional tree resampling
 
 ## Documentation
 
-For comprehensive documentation, examples, and API reference:
-- [Full Documentation](https://rdstools.readthedocs.io/en/latest/)
-- [Examples](https://rdstools.readthedocs.io/en/latest/examples.html)
+For comprehensive documentation and examples:
+- [Full Documentation](https://rdstools-python-package.readthedocs.io/en/latest/)
+- [Examples](https://rdstools-python-package.readthedocs.io/en/latest/examples.html)
+
+## Citation
+
+If you use RDS Tools in your research, please cite:
+
+```
+[Your citation here]
+```
 
 ## License
 
@@ -365,4 +641,23 @@ MIT License - see LICENSE file for details.
 
 ## Contributing
 
-This package is currently in development. Please report issues or suggestions for improving performance and functionality.
+Contributions are welcome! Please feel free to submit a Pull Request.
+
+## Issues and Support
+
+If you encounter any problems or have suggestions for improvements, please open an issue on GitHub.
+
+## Changelog
+
+### Version 0.1.7
+- Split regression into `RDSlm` (linear) and `RDSglm` (logistic), mirroring R's lm/glm
+- `RDSlm` now raises on a binary/categorical outcome (use `RDSglm`); `RDSglm` raises on a numeric/continuous outcome (use `RDSlm`)
+- Logistic outcomes use a consistent alphabetical 0/1 coding; output states the modeled log-odds direction
+- Bootstrap methods are called without the numeric suffix — `chain`, `tree_uni`, `tree_bi` (the 2 version are no longer available)
+
+### Version 0.1.0
+- Initial release with core RDS analysis functions
+- Bootstrap variance estimation with 6 resampling methods
+- Parallel processing support
+- Network visualization capabilities with customizable aesthetics
+- Geographic mapping features with interactive controls

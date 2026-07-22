@@ -8,12 +8,17 @@ Here's a complete example showing how to analyze RDS data from start to finish::
 
     import pandas as pd
     from RDSTools import (
-        RDSdata, RDSmean, RDStable, RDSlm,
+        load_toy_data, RDSdata, RDSmean, RDStable, RDSlm, RDSglm,
         RDSnetgraph, RDSmap, get_available_seeds, print_map_info
     )
 
     # 1. Load and examine your data
-    data = pd.read_csv("rds_survey.csv")
+    # Option A: Use the included example dataset
+    toy_data = load_toy_data()
+
+    # Option B: Load your own data
+    #
+    # data = pd.read_csv("rds_survey.csv")
     print(data.columns)
     print(f"Total participants: {len(data)}")
 
@@ -37,7 +42,7 @@ Here's a complete example showing how to analyze RDS data from start to finish::
         x='Age',
         data=rds_data,
         weight='WEIGHT',
-        var_est='resample_tree_uni1',
+        var_est='tree_uni',
         resample_n=1000,
         n_cores=4
     )
@@ -45,20 +50,21 @@ Here's a complete example showing how to analyze RDS data from start to finish::
 
     # 4. Generate frequency tables
     sex_table = RDStable(
-        formula='~Sex',
+        x='Sex',
         data=rds_data,
         weight='WEIGHT',
-        var_est='resample_tree_uni1',
+        var_est='tree_uni',
         resample_n=1000
     )
     print(sex_table)
 
     # Two-way table
     cross_table = RDStable(
-        formula='~Sex+Race',
+        x='Sex',
+        y='Race',
         data=rds_data,
         weight='WEIGHT',
-        var_est='resample_tree_uni1',
+        var_est='tree_uni',
         resample_n=1000,
         margins=1  # row proportions
     )
@@ -69,7 +75,7 @@ Here's a complete example showing how to analyze RDS data from start to finish::
         data=rds_data,
         formula='Income ~ Age + C(Sex) + C(Race)',
         weight='WEIGHT',
-        var_est='resample_tree_uni1',
+        var_est='tree_uni',
         resample_n=2000,
         n_cores=6
     )
@@ -92,7 +98,7 @@ Weighted mean with bootstrap variance::
         x='Age',
         data=rds_data,
         weight='WEIGHT',
-        var_est='resample_chain1',
+        var_est='chain',
         resample_n=1000
     )
 
@@ -101,7 +107,7 @@ Return bootstrap means for custom analysis::
     result, bootstrap_means, node_counts = RDSmean(
         x='Age',
         data=rds_data,
-        var_est='resample_tree_uni1',
+        var_est='tree_uni',
         resample_n=1000,
         return_bootstrap_means=True,
         return_node_counts=True
@@ -119,16 +125,16 @@ One-way table with different margin options::
 
     # Simple one-way table
     table = RDStable(
-        formula='~Sex',
+        x='Sex',
         data=rds_data
     )
 
     # Weighted one-way table with bootstrap
     table = RDStable(
-        formula='~Race',
+        x='Race',
         data=rds_data,
         weight='WEIGHT',
-        var_est='resample_tree_uni1',
+        var_est='tree_uni',
         resample_n=500
     )
 
@@ -136,21 +142,24 @@ Two-way tables with different proportions::
 
     # Cell proportions (default)
     table_cell = RDStable(
-        formula='~Sex+Race',
+        x='Sex',
+        y='Race',
         data=rds_data,
         margins=3
     )
 
     # Row proportions
     table_row = RDStable(
-        formula='~Sex+Race',
+        x='Sex',
+        y='Race',
         data=rds_data,
         margins=1
     )
 
     # Column proportions
     table_col = RDStable(
-        formula='~Sex+Race',
+        x='Sex',
+        y='Race',
         data=rds_data,
         margins=2
     )
@@ -171,7 +180,7 @@ Multiple linear regression with categorical predictors::
         data=rds_data,
         formula='Income ~ Age + C(Sex) + C(Education) + C(Race)',
         weight='WEIGHT',
-        var_est='resample_tree_uni1',
+        var_est='tree_uni',
         resample_n=1000,
         n_cores=4
     )
@@ -179,10 +188,10 @@ Multiple linear regression with categorical predictors::
 Logistic regression::
 
     # Binary outcome (0/1)
-    model = RDSlm(
+    model = RDSglm(
         data=rds_data,
         formula='Employed ~ Age + C(Sex) + C(Education)',
-        var_est='resample_chain1',
+        var_est='chain',
         resample_n=500
     )
 
@@ -191,7 +200,7 @@ Return bootstrap estimates::
     model, boot_estimates, node_counts = RDSlm(
         data=rds_data,
         formula='Income ~ Age + C(Sex)',
-        var_est='resample_tree_uni1',
+        var_est='tree_uni',
         resample_n=1000,
         return_bootstrap_estimates=True,
         return_node_counts=True
@@ -236,7 +245,7 @@ Color nodes by demographic variables::
         seed_ids=['1', '2', '3'],
         waves=[0, 1, 2],
         layout='Kamada-Kawai',
-        group_by='Sex',
+        variable='Sex',
         node_size=50,
         figsize=(16, 14)
     )
@@ -247,9 +256,39 @@ Color nodes by demographic variables::
         seed_ids=['1'],
         waves=[0, 1, 2, 3],
         layout='Spring',
-        group_by='Race',
+        variable='Race',
         node_size=40
     )
+
+Use custom colors for categories::
+
+    # First, check what categories exist (they'll be sorted)
+    print(sorted(rds_data['Race'].dropna().unique()))
+    # Output: ['Asian', 'Black', 'Hispanic', 'White']
+
+    # Provide colors in the same sorted order
+    custom_colors = ['#FF6B6B', '#4ECDC4', '#45B7D1', '#95E1D3']
+
+    G = RDSnetgraph(
+        data=rds_data,
+        seed_ids=['1', '2'],
+        waves=[0, 1, 2],
+        variable='Race',
+        category_colors=custom_colors,
+        title='Recruitment by Race (Custom Colors)'
+    )
+
+    # Using named colors instead of hex codes
+    G = RDSnetgraph(
+        data=rds_data,
+        seed_ids=['1', '2', '3'],
+        waves=[0, 1, 2, 3],
+        variable='Sex',
+        category_colors=['purple', 'orange'],  # For 2 categories
+        layout='Tree',
+        save_path='network_custom.png'
+    )
+
 
 Geographic Mapping Examples
 ---------------------------
@@ -257,7 +296,7 @@ Geographic Mapping Examples
 Check available mapping data::
 
     # Print comprehensive map information
-    print_map_info(rds_data, lat_column='Latitude', lon_column='Longitude')
+    print_map_info(rds_data, lat='Latitude', long='Longitude')
 
     # Get available seeds and waves
     seeds = get_available_seeds(rds_data)
@@ -280,8 +319,8 @@ Map with custom coordinates and settings::
         data=rds_data,
         seed_ids=['1', '2', '3'],
         waves=[0, 1, 2, 3, 4],
-        lat_column='lat',
-        lon_column='long',
+        lat='lat',
+        long='long',
         output_file='geographic_map.html',
         zoom_start=10,
         open_browser=True
@@ -301,7 +340,7 @@ Standalone bootstrap resampling::
         seed_id_col='S_ID',
         seed_col='SEED',
         recruiter_id_col='R_ID',
-        type='resample_tree_uni1',
+        type='tree_uni',
         resample_n=1000
     )
 
@@ -321,7 +360,7 @@ Parallel bootstrap for large datasets::
         seed_id_col='S_ID',
         seed_col='SEED',
         recruiter_id_col='R_ID',
-        type='resample_tree_uni1',
+        type='tree_uni',
         resample_n=10000,
         n_cores=8
     )
@@ -362,7 +401,7 @@ Here's a complete pipeline from data loading to final results::
 
     import pandas as pd
     from RDSTools import (
-        RDSdata, RDSmean, RDStable, RDSlm,
+        load_toy_data, RDSdata, RDSmean, RDStable, RDSlm, RDSglm,
         RDSnetgraph, RDSmap, get_available_seeds
     )
 
@@ -383,25 +422,26 @@ Here's a complete pipeline from data loading to final results::
         x='Age',
         data=rds_data,
         weight='WEIGHT',
-        var_est='resample_tree_uni1',
+        var_est='tree_uni',
         resample_n=1000,
         n_cores=4
     )
 
     # Frequency tables
     sex_table = RDStable(
-        formula='~Sex',
+        x='Sex',
         data=rds_data,
         weight='WEIGHT',
-        var_est='resample_tree_uni1',
+        var_est='tree_uni',
         resample_n=1000
     )
 
     race_sex_table = RDStable(
-        formula='~Sex+Race',
+        x='Sex',
+        y='Race',
         data=rds_data,
         weight='WEIGHT',
-        var_est='resample_tree_uni1',
+        var_est='tree_uni',
         resample_n=1000,
         margins=1
     )
@@ -411,7 +451,7 @@ Here's a complete pipeline from data loading to final results::
         data=rds_data,
         formula='Income ~ Age + C(Sex) + C(Race) + C(Education)',
         weight='WEIGHT',
-        var_est='resample_tree_uni1',
+        var_est='tree_uni',
         resample_n=2000,
         n_cores=4
     )
@@ -425,7 +465,7 @@ Here's a complete pipeline from data loading to final results::
         seed_ids=seeds[:2],
         waves=[0, 1, 2, 3],
         layout='Spring',
-        group_by='Sex',
+        variable='Sex',
         save_path='network.png'
     )
 
@@ -445,3 +485,4 @@ Here's a complete pipeline from data loading to final results::
     print(sex_table)
     print("\nRegression Model:")
     print(model)
+
